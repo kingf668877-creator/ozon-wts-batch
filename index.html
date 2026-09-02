@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OZON 畅销商品批量查询 · What to Sell</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <span class="badge">Ozon Seller · What to Sell</span>
+      <h1>📦 批量取畅销商品运营数据</h1>
+      <p class="lede">输入商品 ID / 商品链接 / 粘贴表格，自动调 data/v3 接口获取商品名称、品牌、销售额、销量等字段，结果一键导出 CSV / Excel。</p>
+      <div class="hero-stats">
+        <div><strong>单次最多</strong><span>30 个 ID</span></div>
+        <div><strong>并发</strong><span>3 路</span></div>
+        <div><strong>耗时</strong><span>≈ 6s / 30 条</span></div>
+        <div><strong>鉴权</strong><span>复用卖家后台登录态</span></div>
+      </div>
+    </div>
+  </header>
+  <main class="container layout">
+    <section class="panel input-panel">
+      <h2>输入</h2>
+      <div class="tabs">
+        <button class="tab active" data-tab="ids">📝 批量 ID</button>
+        <button class="tab" data-tab="links">🔗 链接列表</button>
+        <button class="tab" data-tab="table">📋 表格粘贴</button>
+      </div>
+      <div class="tab-panel active" data-tab="ids">
+        <label class="label">商品 ID（每行一个）</label>
+        <textarea id="input-ids" rows="6" placeholder="140030730\n149710140"></textarea>
+      </div>
+      <div class="tab-panel" data-tab="links">
+        <label class="label">Ozon 商品链接（每行一个）</label>
+        <textarea id="input-links" rows="6" placeholder="https://www.ozon.ru/product/140030730"></textarea>
+      </div>
+      <div class="tab-panel" data-tab="table">
+        <label class="label">表格粘贴</label>
+        <textarea id="input-table" rows="8" placeholder="sku\tname"></textarea>
+      </div>
+      <div class="row">
+        <label class="field"><span>每批最多 ID</span><input id="batch-size" type="number" value="30" min="1" max="100" /></label>
+        <label class="field"><span>并发数</span><input id="concurrency" type="number" value="3" min="1" max="8" /></label>
+        <label class="field"><span>请求间隔(ms)</span><input id="interval" type="number" value="200" min="0" max="5000" /></label>
+      </div>
+      <div class="actions">
+        <button id="run-btn" class="primary">▶ 开始查询</button>
+        <button id="stop-btn" class="ghost" disabled>⏹ 停止</button>
+        <button id="export-csv" class="ghost" disabled>导出 CSV</button>
+        <button id="export-json" class="ghost" disabled>导出 JSON</button>
+        <button id="clear-btn" class="ghost">清空</button>
+      </div>
+      <div class="status" id="status"><span class="dot"></span><span id="status-text">等待输入...</span></div>
+      <div class="hint">提示：本工具调用 Ozon Seller 后台同源接口 data/v3，请先打开<a href="https://seller.ozon.ru/app/analytics/what-to-sell/ozon-bestsellers">卖家后台</a>保持登录。</div>
+    </section>
+    <section class="panel result-panel">
+      <div class="result-head"><h2>结果 <span id="result-count" class="badge-count">0</span></h2><div class="filter-row"><input id="filter-input" placeholder="过滤..." /><select id="sort-key"><option value="gmvSum">按销售金额</option><option value="soldCount">按销量</option><option value="avgPrice">按均价</option><option value="salesDynamics">按订单动态</option></select></div></div>
+      <div class="progress-wrap"><div class="progress" id="progress-bar"></div><span class="progress-text" id="progress-text">0 / 0</span></div>
+      <div class="table-wrap"><table id="result-table"><thead><tr><th>#</th><th>SKU</th><th>商品</th><th>品牌</th><th>类目</th><th>销售金额</th><th>销量</th><th>均价</th><th>漏失销售</th><th>订单动态</th><th>加购率</th><th>链接</th></tr></thead><tbody id="result-body"><tr class="empty"><td colspan="12">暂无数据</td></tr></tbody></table></div>
+    </section>
+  </main>
+  <footer class="foot"><div class="container"><span>OZON 畅销商品批量查询</span><span><a href="https://github.com/kingf668877-creator/ozon-wts-batch">GitHub</a></span></div></footer>
+  <script src="js/app.js"></script>
+</body>
+</html>
