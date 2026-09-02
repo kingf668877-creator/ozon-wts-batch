@@ -1,0 +1,5 @@
+# Local-only artifacts
+node_modules/
+.DS_Store
+*.log
+uploads/
