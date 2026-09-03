@@ -115,7 +115,43 @@
     return data;
   }
 
+  function fmtMoney(value) {
+    var number = Number(value || 0);
+    if (!isFinite(number)) number = 0;
+    return number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+  }
+
+  function fmtNumber(value) {
+    var number = Number(value || 0);
+    if (!isFinite(number)) number = 0;
+    return number.toLocaleString('en-US');
+  }
+
+  function fmtPercent(value) {
+    var number = Number(value || 0);
+    if (!isFinite(number)) number = 0;
+    return number.toFixed(2) + '%';
+  }
+
+  function fmtStock(item) {
+    var stock = Number(item.stock || 0);
+    var fbo = Number(item.fboStock || 0);
+    var fbs = Number(item.fbsStock || 0);
+    if (stock) return fmtNumber(stock);
+    return fmtNumber(fbo + fbs);
+  }
+
+  function fmtDate(value) {
+    if (!value) return '-';
+    var text = String(value);
+    var match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : text;
+  }
+
   function fmtRow(item) {
+    var fbo = Number(item.fboStock || 0);
+    var fbs = Number(item.fbsStock || 0);
+    var stock = Number(item.stock || 0) || (fbo + fbs);
     return {
       sku: item.sku || '',
       name: item.name || '',
@@ -125,25 +161,27 @@
       category3: item.category3 || '',
       link: item.link || '',
       photo: item.photo || '',
-      gmvSum: Number(item.gmvSum || 0),
+      article: item.article || '',
+      volume: Number(item.volume || 0),
+      soldSum: Number(item.soldSum || item.gmvSum || 0),
       soldCount: Number(item.soldCount || 0),
       minSellerPrice: Number(item.minSellerPrice || 0),
-      avgGmv: Number(item.avgGmv || 0),
+      avgPrice: Number(item.avgPrice || item.avgGmv || 0),
       sumMissedGmv: Number(item.sumMissedGmv || 0),
-      salesDynamics: Number(item.nullableSalesDynamics ?? item.salesDynamics ?? 0),
-      avgGmvOnAccDays: Number(item.avgGmvOnAccDays || 0),
-      avgOrdersOnAccDays: Number(item.avgOrdersOnAccDays || 0),
-      sessionCountSearch: Number(item.sessionCountSearch || 0),
-      sessionCount: Number(item.sessionCount || 0),
-      convToCartSearch: Number(item.convToCartSearch || 0),
-      pdpToCartConversion: Number(item.pdpToCartConversion || 0),
-      advCostShare: Number(item.advCostShare || 0),
-      nullableBuyoutShare: Number(item.nullableBuyoutRate ?? item.nullableBuyoutShare ?? 0),
+      salesDynamics: Number(item.salesDynamics || 0),
+      views: Number(item.views || 0),
+      stock: stock,
       nullableCreateDate: item.nullableCreateDate || '',
-      fboCommission: Number(item.fboCommission || 0),
-      fbsCommission: Number(item.fbsCommission || 0),
-      salesSchema: item.salesSchema || '',
-      volume: Number(item.volume || 0)
+      pdpToCartConversion: Number(item.pdpToCartConversion || 0),
+      avgOrdersOnAccDays: Number(item.avgOrdersOnAccDays || 0),
+      sessionCount: Number(item.sessionCount || 0),
+      sessionCountSearch: Number(item.sessionCountSearch || 0),
+      convToCartSearch: Number(item.convToCartSearch || 0),
+      drr: Number(item.drr || 0),
+      discount: Number(item.discount || 0),
+      avgDeliveryDays: Number(item.avgDeliveryDays || 0),
+      accessibility: Number(item.accessibility || 0),
+      salesSchema: item.salesSchema || ''
     };
   }
 
@@ -160,29 +198,36 @@
 
     if (filter) {
       rows = rows.filter(function (row) {
-        return [row.sku, row.name, row.brand, row.category3, row.category1].some(function (value) {
+        return [row.sku, row.name, row.brand, row.category3, row.category1, row.article].some(function (value) {
           return String(value || '').toLowerCase().indexOf(filter) >= 0;
         });
       });
     }
     rows.sort(function (a, b) { return (b[sortKey] || 0) - (a[sortKey] || 0); });
     els.count.textContent = rows.length;
-    els.body.innerHTML = rows.length ? '' : '<tr class="empty"><td colspan="12">' + (state.rows.length ? '过滤无结果' : '暂无数据') + '</td></tr>';
+    els.body.innerHTML = rows.length ? '' : '<tr class="empty"><td colspan="15">' + (state.rows.length ? '过滤无结果' : '暂无数据') + '</td></tr>';
 
     var fragment = document.createDocumentFragment();
     rows.forEach(function (row, index) {
+      var dynamics = row.salesDynamics || 0;
+      var dynamicCls = dynamics > 0 ? 'gmv-up' : (dynamics < 0 ? 'gmv-down' : '');
+      var dynamicSymbol = dynamics > 0 ? '+' : '';
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + (index + 1) + '</td>' +
-        '<td class="sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
-        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<span>' + esc(row.name) + '</span></div></td>' +
+      tr.innerHTML = '<td class="col-num">' + (index + 1) + '</td>' +
+        '<td class="col-sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
+        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="muted" style="font-size:11px;color:var(--muted)">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
         '<td>' + (esc(row.brand) || '-') + '</td>' +
         '<td>' + (esc(row.category3) || esc(row.category1) || '-') + '</td>' +
-        '<td>' + (row.gmvSum || 0).toLocaleString() + '</td>' +
-        '<td>' + (row.soldCount || 0).toLocaleString() + '</td>' +
-        '<td>' + (row.avgGmv || 0).toLocaleString() + '</td>' +
-        '<td>' + (row.sumMissedGmv || 0).toLocaleString() + '</td>' +
-        '<td>' + row.salesDynamics + '%</td>' +
-        '<td>' + (row.pdpToCartConversion || 0).toFixed(2) + '%</td>' +
+        '<td class="num">' + fmtMoney(row.soldSum) + '</td>' +
+        '<td class="num">' + fmtNumber(row.soldCount) + '</td>' +
+        '<td class="num">' + fmtMoney(row.minSellerPrice) + '</td>' +
+        '<td class="num">' + fmtMoney(row.avgPrice) + '</td>' +
+        '<td class="num">' + fmtMoney(row.sumMissedGmv) + '</td>' +
+        '<td class="num ' + dynamicCls + '">' + dynamicSymbol + dynamics.toFixed(2) + '%</td>' +
+        '<td class="num">' + fmtPercent(row.pdpToCartConversion) + '</td>' +
+        '<td class="num">' + fmtNumber(row.views) + '</td>' +
+        '<td class="num">' + fmtNumber(row.stock) + '</td>' +
+        '<td>' + fmtDate(row.nullableCreateDate) + '</td>' +
         '<td><a href="' + esc(row.link) + '" target="_blank" rel="noopener">查看</a></td>';
       fragment.appendChild(tr);
     });
@@ -295,7 +340,7 @@
   }
 
   function exportCsv() {
-    var headers = ['sku', 'name', 'brand', 'category1', 'category2', 'category3', 'link', 'photo', 'gmvSum', 'soldCount', 'minSellerPrice', 'avgGmv', 'sumMissedGmv', 'salesDynamics', 'avgGmvOnAccDays', 'avgOrdersOnAccDays', 'sessionCountSearch', 'sessionCount', 'convToCartSearch', 'pdpToCartConversion', 'advCostShare', 'nullableBuyoutShare', 'nullableCreateDate', 'fboCommission', 'fbsCommission', 'salesSchema', 'volume'];
+    var headers = ['sku', 'name', 'brand', 'category1', 'category2', 'category3', 'link', 'photo', 'article', 'volume_l', 'soldSum_rub', 'soldCount', 'minSellerPrice_rub', 'avgPrice_rub', 'sumMissedGmv_rub', 'salesDynamics_pct', 'pdpToCartConversion_pct', 'views', 'stock', 'avgOrdersOnAccDays', 'sessionCount', 'sessionCountSearch', 'convToCartSearch', 'drr', 'discount', 'avgDeliveryDays', 'accessibility', 'salesSchema', 'nullableCreateDate'];
     var escapeCsv = function (value) {
       var text = String(value == null ? '' : value);
       return /[",\n]/.test(text) ? ('"' + text.replace(/"/g, '""') + '"') : text;
