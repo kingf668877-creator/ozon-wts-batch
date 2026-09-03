@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OZON 畅销商品批量查询 · What to Sell</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23005bff'/><text x='32' y='44' font-family='Segoe UI,Arial' font-size='34' font-weight='700' text-anchor='middle' fill='white'>O</text></svg>" />
-  <link rel="stylesheet" href="css/style.css?v=20260903-4" />
+  <link rel="stylesheet" href="css/style.css?v=20260903-5" />
 </head>
 <body>
   <header class="hero">
@@ -83,10 +83,30 @@
     <section class="panel result-panel">
       <div class="result-head"><h2>结果 <span id="result-count" class="badge-count">0</span></h2><div class="filter-row"><input id="filter-input" placeholder="过滤..." /><select id="sort-key"><option value="soldSum">按销售金额</option><option value="soldCount">按销量</option><option value="minSellerPrice">按卖家价</option><option value="avgPrice">按均价</option><option value="sumMissedGmv">按漏失销售</option><option value="salesDynamics">按订单动态</option><option value="pdpToCartConversion">按加购率</option><option value="views">按流量</option><option value="stock">按库存</option></select></div></div>
       <div class="progress-wrap"><div class="progress" id="progress-bar"></div><span class="progress-text" id="progress-text">0 / 0</span></div>
+      <div class="pager">
+        <div class="pager-left">
+          <span>每页</span>
+          <select id="page-size">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <span class="pager-info">第 <span id="page-current">0</span> / <span id="page-total">0</span> 页</span>
+        </div>
+        <div class="pager-right">
+          <button id="page-first" class="ghost small" type="button" disabled>« 首页</button>
+          <button id="page-prev" class="ghost small" type="button" disabled>‹ 上一页</button>
+          <span class="pager-numbers" id="page-numbers"></span>
+          <button id="page-next" class="ghost small" type="button" disabled>下一页 ›</button>
+          <button id="page-last" class="ghost small" type="button" disabled>末页 »</button>
+          <span class="pager-jump">跳至 <input id="page-jump" type="number" min="1" value="1" /> 页</span>
+        </div>
+      </div>
       <div class="table-wrap"><table id="result-table"><thead><tr><th class="col-num">#</th><th class="col-sku">SKU</th><th>商品</th><th>品牌</th><th>类目</th><th class="num">销售金额 (₽)</th><th class="num">销量</th><th class="num">卖家价 (₽)</th><th class="num">均价 (₽)</th><th class="num">漏失销售 (₽)</th><th class="num">订单动态 (%)</th><th class="num">加购率 (%)</th><th class="num">流量</th><th class="num">库存</th><th>创建日期</th><th>操作</th></tr></thead><tbody id="result-body"><tr class="empty"><td colspan="15">暂无数据</td></tr></tbody></table></div>
     </section>
   </main>
   <footer class="foot"><div class="container"><span>OZON 畅销商品批量查询</span><span><a href="https://github.com/kingf668877-creator/ozon-wts-batch">GitHub</a></span></div></footer>
-  <script src="js/app.js?v=20260903-4"></script>
+  <script src="js/app.js?v=20260903-5"></script>
 </body>
 </html>
