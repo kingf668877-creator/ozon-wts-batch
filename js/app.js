@@ -406,7 +406,7 @@
       var tr = document.createElement('tr');
       tr.innerHTML = '<td class="col-num">' + (index + 1) + '</td>' +
         '<td class="col-sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
-        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="muted" style="font-size:11px;color:var(--muted)">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
+        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="cell-sub">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
         '<td>' + (esc(row.brand) || '-') + '</td>' +
         '<td>' + (esc(row.category3) || esc(row.category1) || '-') + '</td>' +
         '<td class="num">' + fmtMoney(row.soldSum) + '</td>' +
