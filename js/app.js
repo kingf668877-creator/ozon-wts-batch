@@ -477,9 +477,9 @@
       var tr = document.createElement('tr');
       tr.innerHTML = '<td class="col-num">' + absoluteIndex + '</td>' +
         '<td class="col-sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
-        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="cell-sub">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
-        '<td>' + (esc(row.brand) || '-') + '</td>' +
-        '<td>' + (esc(row.category3) || esc(row.category1) || '-') + '</td>' +
+        '<td class="col-name"><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="cell-sub">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
+        '<td class="col-brand">' + (esc(row.brand) || '-') + '</td>' +
+        '<td class="col-category">' + (esc(row.category3) || esc(row.category1) || '-') + '</td>' +
         '<td class="num">' + fmtMoney(row.soldSum) + '</td>' +
         '<td class="num">' + fmtNumber(row.soldCount) + '</td>' +
         '<td class="num">' + fmtMoney(row.minSellerPrice) + '</td>' +
@@ -489,8 +489,8 @@
         '<td class="num">' + fmtPercent(row.pdpToCartConversion) + '</td>' +
         '<td class="num">' + fmtNumber(row.views) + '</td>' +
         '<td class="num">' + fmtNumber(row.stock) + '</td>' +
-        '<td>' + fmtDate(row.nullableCreateDate) + '</td>' +
-        '<td><a href="' + esc(row.link) + '" target="_blank" rel="noopener">查看</a></td>';
+        '<td class="col-date">' + fmtDate(row.nullableCreateDate) + '</td>' +
+        '<td class="col-action"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">查看</a></td>';
       fragment.appendChild(tr);
     });
     els.body.appendChild(fragment);
