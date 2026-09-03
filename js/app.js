@@ -33,7 +33,16 @@
     fileSample: $('#file-sample'),
     previewBody: $('#preview-body'),
     previewSummary: $('#preview-summary'),
-    previewSelectAll: $('#preview-select-all')
+    previewSelectAll: $('#preview-select-all'),
+    pageSize: $('#page-size'),
+    pageFirst: $('#page-first'),
+    pagePrev: $('#page-prev'),
+    pageNext: $('#page-next'),
+    pageLast: $('#page-last'),
+    pageNumbers: $('#page-numbers'),
+    pageCurrent: $('#page-current'),
+    pageTotal: $('#page-total'),
+    pageJump: $('#page-jump')
   };
 
   const state = {
@@ -43,7 +52,10 @@
     seenSku: new Set(),
     controller: null,
     preview: [],
-    fileLoaded: false
+    fileLoaded: false,
+    page: 1,
+    pageSize: 25,
+    sortedRows: []
   };
 
   /* ----------- Tab 切换 ----------- */
@@ -382,11 +394,10 @@
     });
   }
 
-  function render() {
+  function computeSortedRows() {
     var filter = (els.filter.value || '').toLowerCase();
     var sortKey = els.sortKey.value;
     var rows = state.rows.slice();
-
     if (filter) {
       rows = rows.filter(function (row) {
         return [row.sku, row.name, row.brand, row.category3, row.category1, row.article].some(function (value) {
@@ -395,16 +406,76 @@
       });
     }
     rows.sort(function (a, b) { return (b[sortKey] || 0) - (a[sortKey] || 0); });
-    els.count.textContent = rows.length;
-    els.body.innerHTML = rows.length ? '' : '<tr class="empty"><td colspan="15">' + (state.rows.length ? '过滤无结果' : '暂无数据') + '</td></tr>';
+    return rows;
+  }
+
+  function totalPages() {
+    return Math.max(1, Math.ceil(state.sortedRows.length / state.pageSize));
+  }
+
+  function clampPage(page) {
+    var total = totalPages();
+    if (page < 1) page = 1;
+    if (page > total) page = total;
+    return page;
+  }
+
+  function buildPageNumbers(current, total) {
+    if (total <= 1) return '';
+    var pages = [];
+    var window = 1;
+
+    function push(value, label, active) {
+      pages.push('<button type="button" data-page="' + value + '" class="' + (active ? 'active' : '') + '">' + label + '</button>');
+    }
+
+    push(1, '1', current === 1);
+    var left = Math.max(2, current - window);
+    var right = Math.min(total - 1, current + window);
+    if (left > 2) pages.push('<span class="ellipsis">…</span>');
+    for (var p = left; p <= right; p++) {
+      if (p === 1 || p === total) continue;
+      push(p, String(p), current === p);
+    }
+    if (right < total - 1) pages.push('<span class="ellipsis">…</span>');
+    if (total > 1) push(total, String(total), current === total);
+    return pages.join('');
+  }
+
+  function renderPager() {
+    var total = totalPages();
+    if (state.page > total) state.page = total;
+    els.pageCurrent.textContent = total > 0 ? String(state.page) : '0';
+    els.pageTotal.textContent = String(total);
+    els.pageNumbers.innerHTML = buildPageNumbers(state.page, total);
+    els.pageFirst.disabled = state.page <= 1;
+    els.pagePrev.disabled = state.page <= 1;
+    els.pageNext.disabled = state.page >= total;
+    els.pageLast.disabled = state.page >= total;
+    els.pageJump.value = total > 0 ? String(state.page) : '1';
+  }
+
+  function render() {
+    state.sortedRows = computeSortedRows();
+    var totalRows = state.sortedRows.length;
+    var totalPagesCount = totalPages();
+    if (state.page > totalPagesCount) state.page = totalPagesCount;
+    if (state.page < 1) state.page = 1;
+
+    var start = (state.page - 1) * state.pageSize;
+    var pageRows = state.sortedRows.slice(start, start + state.pageSize);
+
+    els.count.textContent = totalRows;
+    els.body.innerHTML = pageRows.length ? '' : '<tr class="empty"><td colspan="15">' + (state.rows.length ? '过滤无结果' : '暂无数据') + '</td></tr>';
 
     var fragment = document.createDocumentFragment();
-    rows.forEach(function (row, index) {
+    pageRows.forEach(function (row, index) {
       var dynamics = row.salesDynamics || 0;
       var dynamicCls = dynamics > 0 ? 'gmv-up' : (dynamics < 0 ? 'gmv-down' : '');
       var dynamicSymbol = dynamics > 0 ? '+' : '';
+      var absoluteIndex = start + index + 1;
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td class="col-num">' + (index + 1) + '</td>' +
+      tr.innerHTML = '<td class="col-num">' + absoluteIndex + '</td>' +
         '<td class="col-sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
         '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<div><div class="name">' + esc(row.name) + '</div><div class="cell-sub">货号 ' + esc(row.article || '-') + ' · 体积 ' + (row.volume || 0).toLocaleString('en-US', { maximumFractionDigits: 3 }) + ' L</div></div></div></td>' +
         '<td>' + (esc(row.brand) || '-') + '</td>' +
@@ -425,6 +496,7 @@
     els.body.appendChild(fragment);
     els.exportCsv.disabled = state.rows.length === 0;
     els.exportJson.disabled = state.rows.length === 0;
+    renderPager();
   }
 
   function setStatus(cssClass, text) {
@@ -460,6 +532,7 @@
     state.aborted = false;
     state.seenSku = new Set();
     state.running = true;
+    state.page = 1;
     els.run.disabled = true;
     els.stop.disabled = false;
     render();
@@ -574,6 +647,7 @@
     state.rows = [];
     state.fileLoaded = false;
     state.preview = [];
+    state.page = 1;
     render();
     renderPreview();
     setStatus('', '等待输入...');
@@ -582,8 +656,33 @@
 
   els.exportCsv.addEventListener('click', exportCsv);
   els.exportJson.addEventListener('click', exportJson);
-  els.filter.addEventListener('input', render);
-  els.sortKey.addEventListener('change', render);
+  els.filter.addEventListener('input', function () { state.page = 1; render(); });
+  els.sortKey.addEventListener('change', function () { state.page = 1; render(); });
+
+  els.pageSize.addEventListener('change', function () {
+    var size = parseInt(els.pageSize.value, 10) || 25;
+    state.pageSize = clamp(size, 1, 1000);
+    state.page = 1;
+    render();
+  });
+  els.pageFirst.addEventListener('click', function () { state.page = 1; render(); });
+  els.pagePrev.addEventListener('click', function () { state.page = clampPage(state.page - 1); render(); });
+  els.pageNext.addEventListener('click', function () { state.page = clampPage(state.page + 1); render(); });
+  els.pageLast.addEventListener('click', function () { state.page = totalPages(); render(); });
+  els.pageJump.addEventListener('change', function () {
+    var target = parseInt(els.pageJump.value, 10);
+    if (!isFinite(target)) return;
+    state.page = clampPage(target);
+    render();
+  });
+  els.pageNumbers.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!(target && target.tagName === 'BUTTON')) return;
+    var page = parseInt(target.getAttribute('data-page'), 10);
+    if (!isFinite(page)) return;
+    state.page = clampPage(page);
+    render();
+  });
 
   els.fileInput.addEventListener('change', function () {
     var file = els.fileInput.files && els.fileInput.files[0];
