@@ -11,12 +11,12 @@
     <div class="container">
       <span class="badge">Ozon Seller · What to Sell</span>
       <h1>📦 批量取畅销商品运营数据</h1>
-      <p class="lede">输入商品 ID / 商品链接 / 粘贴表格，自动调 data/v3 接口获取商品名称、品牌、销售额、销量等字段，结果一键导出 CSV / Excel。</p>
+      <p class="lede">输入商品 ID / 商品链接 / 粘贴表格，通过安全桥接服务获取商品名称、品牌、销售额、销量等字段，结果一键导出 CSV / JSON。</p>
       <div class="hero-stats">
-        <div><strong>单次最多</strong><span>30 个 ID</span></div>
-        <div><strong>并发</strong><span>3 路</span></div>
-        <div><strong>耗时</strong><span>≈ 6s / 30 条</span></div>
-        <div><strong>鉴权</strong><span>复用卖家后台登录态</span></div>
+        <div><strong>自动分批</strong><span>每批 12 个 ID</span></div>
+        <div><strong>精确匹配</strong><span>校验返回 SKU</span></div>
+        <div><strong>输入方式</strong><span>ID / 链接 / 表格</span></div>
+        <div><strong>鉴权</strong><span>本地 Seller 会话</span></div>
       </div>
     </div>
   </header>
@@ -41,9 +41,8 @@
         <textarea id="input-table" rows="8" placeholder="sku\tname"></textarea>
       </div>
       <div class="row">
-        <label class="field"><span>每批最多 ID</span><input id="batch-size" type="number" value="30" min="1" max="100" /></label>
-        <label class="field"><span>并发数</span><input id="concurrency" type="number" value="3" min="1" max="8" /></label>
-        <label class="field"><span>请求间隔(ms)</span><input id="interval" type="number" value="200" min="0" max="5000" /></label>
+        <label class="field"><span>每批最多 ID</span><input id="batch-size" type="number" value="12" min="1" max="12" /></label>
+        <label class="field"><span>批次间隔(ms)</span><input id="interval" type="number" value="300" min="0" max="5000" /></label>
       </div>
       <div class="actions">
         <button id="run-btn" class="primary">▶ 开始查询</button>
@@ -53,7 +52,7 @@
         <button id="clear-btn" class="ghost">清空</button>
       </div>
       <div class="status" id="status"><span class="dot"></span><span id="status-text">等待输入...</span></div>
-      <div class="hint">提示：本工具调用 Ozon Seller 后台同源接口 data/v3，请先打开<a href="https://seller.ozon.ru/app/analytics/what-to-sell/ozon-bestsellers">卖家后台</a>保持登录。</div>
+      <div class="hint">提示：请先运行桌面“一键启动图搜”，并在专用 Chrome 的<a href="https://seller.ozon.ru/app/analytics/what-to-sell/ozon-bestsellers">卖家后台</a>保持登录。</div>
     </section>
     <section class="panel result-panel">
       <div class="result-head"><h2>结果 <span id="result-count" class="badge-count">0</span></h2><div class="filter-row"><input id="filter-input" placeholder="过滤..." /><select id="sort-key"><option value="gmvSum">按销售金额</option><option value="soldCount">按销量</option><option value="avgPrice">按均价</option><option value="salesDynamics">按订单动态</option></select></div></div>
@@ -62,6 +61,6 @@
     </section>
   </main>
   <footer class="foot"><div class="container"><span>OZON 畅销商品批量查询</span><span><a href="https://github.com/kingf668877-creator/ozon-wts-batch">GitHub</a></span></div></footer>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=20260903-1"></script>
 </body>
 </html>
