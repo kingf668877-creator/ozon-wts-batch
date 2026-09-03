@@ -47,7 +47,24 @@
       </div>
       <div class="tab-panel" data-tab="table">
         <label class="label">表格粘贴</label>
-        <textarea id="input-table" rows="8" placeholder="sku&#9;name"></textarea>
+        <textarea id="input-table" rows="8" placeholder="sku&#9;name&#10;140030730&#9;Калинов Родник"></textarea>
+        <div class="upload-row">
+          <label class="upload-btn" for="file-input">📂 上传文件（.xlsx / .xls / .csv / .txt）</label>
+          <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+          <button id="file-sample" class="ghost small" type="button">载入示例</button>
+        </div>
+        <div class="preview-head">
+          <span>解析预览</span>
+          <span id="preview-summary" class="muted"></span>
+          <span class="spacer"></span>
+          <label class="checkbox"><input type="checkbox" id="preview-select-all" /> 全选</label>
+        </div>
+        <div class="preview-wrap">
+          <table class="preview-table">
+            <thead><tr><th class="col-check">☑</th><th>#</th><th>原始内容</th><th>识别为</th><th>状态</th></tr></thead>
+            <tbody id="preview-body"><tr class="empty"><td colspan="5">等待上传文件或粘贴表格…</td></tr></tbody>
+          </table>
+        </div>
       </div>
       <div class="row">
         <label class="field"><span>每批最多 ID</span><input id="batch-size" type="number" value="12" min="1" max="12" /></label>
@@ -70,6 +87,6 @@
     </section>
   </main>
   <footer class="foot"><div class="container"><span>OZON 畅销商品批量查询</span><span><a href="https://github.com/kingf668877-creator/ozon-wts-batch">GitHub</a></span></div></footer>
-  <script src="js/app.js?v=20260903-2"></script>
+  <script src="js/app.js?v=20260903-3"></script>
 </body>
 </html>
