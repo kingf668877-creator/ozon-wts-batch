@@ -3,7 +3,9 @@
   'use strict';
 
   const API_URL = 'https://yidong.dianleida.net:21999/api/wts/query';
+  const SHEETJS_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
   const $ = function (selector) { return document.querySelector(selector); };
+
   const els = {
     tabs: document.querySelectorAll('.tab'),
     panels: document.querySelectorAll('.tab-panel'),
@@ -26,10 +28,25 @@
     body: $('#result-body'),
     count: $('#result-count'),
     filter: $('#filter-input'),
-    sortKey: $('#sort-key')
+    sortKey: $('#sort-key'),
+    fileInput: $('#file-input'),
+    fileSample: $('#file-sample'),
+    previewBody: $('#preview-body'),
+    previewSummary: $('#preview-summary'),
+    previewSelectAll: $('#preview-select-all')
   };
-  const state = { rows: [], aborted: false, running: false, seenSku: new Set(), controller: null };
 
+  const state = {
+    rows: [],
+    aborted: false,
+    running: false,
+    seenSku: new Set(),
+    controller: null,
+    preview: [],
+    fileLoaded: false
+  };
+
+  /* ----------- Tab 切换 ----------- */
   els.tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       els.tabs.forEach(function (item) { item.classList.toggle('active', item === tab); });
@@ -37,42 +54,226 @@
     });
   });
 
-  function currentInput() {
-    var active = document.querySelector('.tab-panel.active');
-    return active ? (els.inputs[active.dataset.tab].value || '') : '';
-  }
-
-  function parseIds() {
-    var items = currentInput().split(/[\s,;\t\n]+/).map(function (value) {
-      return value.replace(/^["'`]+|["'`]+$/g, '').trim();
-    }).filter(Boolean);
-    var seen = {};
-    var output = [];
-
-    items.forEach(function (item) {
-      var sku = extractSku(item);
-      if (sku && !seen[sku]) {
-        seen[sku] = true;
-        output.push(sku);
-      }
-    });
-    return output;
-  }
-
+  /* ----------- 解析：把任意输入拆成 {raw, sku, type, ok, selected} 列表 ----------- */
   function extractSku(text) {
     if (!text) return '';
     var fromLink = text.match(/ozon\.ru\/product\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
     if (fromLink) return fromLink[1];
-    var labelled = text.match(/(?:^|\b)(?:sku|id|product)[ _:=-]+(\d{5,12})\b/i);
+    var labelled = text.match(/(?:^|\b)(?:sku|id|product|article|货号)[ _:=-]+(\d{5,12})\b/i);
     if (labelled) return labelled[1];
     var plain = text.match(/\b(\d{5,12})\b/);
     return plain ? plain[1] : '';
   }
 
+  function classify(raw) {
+    if (!raw) return { ok: false, reason: '空内容' };
+    var sku = extractSku(String(raw));
+    if (!sku) return { ok: false, reason: '未识别出 ID' };
+    var isLink = /ozon\.ru\/product\//i.test(String(raw));
+    return { ok: true, sku: sku, type: isLink ? 'link' : 'id', reason: '' };
+  }
+
+  function tokenize(text) {
+    if (!text) return [];
+    return String(text).split(/\r?\n|[\t;,]+/).map(function (line) {
+      return line.replace(/^["'`\s]+|["'`\s]+$/g, '');
+    }).filter(Boolean);
+  }
+
+  function buildPreview(items) {
+    var seen = {};
+    var preview = [];
+    items.forEach(function (raw, idx) {
+      var parsed = classify(raw);
+      var key = parsed.sku || ('raw:' + idx + ':' + raw);
+      var dedupe = parsed.ok && seen[key];
+      preview.push({
+        index: idx + 1,
+        raw: raw,
+        sku: parsed.sku || '',
+        type: parsed.type || '',
+        ok: parsed.ok,
+        reason: dedupe ? '重复' : (parsed.reason || ''),
+        selected: parsed.ok && !dedupe,
+        duplicate: dedupe
+      });
+      if (parsed.ok && !dedupe) seen[key] = true;
+    });
+    return preview;
+  }
+
+  function parseTableText(text) {
+    return tokenize(text);
+  }
+
+  function parseDelimitedRows(text) {
+    return tokenize(text);
+  }
+
+  function parseFileRows(rows) {
+    var out = [];
+    rows.forEach(function (row) {
+      if (!Array.isArray(row)) return;
+      row.forEach(function (cell) {
+        if (cell == null) return;
+        var value = String(cell).trim();
+        if (value) out.push(value);
+      });
+    });
+    return out;
+  }
+
+  function currentTabName() {
+    var active = document.querySelector('.tab-panel.active');
+    return active ? active.dataset.tab : '';
+  }
+
+  function currentInput() {
+    var tab = currentTabName();
+    return tab && els.inputs[tab] ? (els.inputs[tab].value || '') : '';
+  }
+
+  function refreshPreview() {
+    var items = state.fileLoaded ? flatFileItems() : parseTableText(currentInput());
+    state.preview = buildPreview(items);
+    renderPreview();
+  }
+
+  function flatFileItems() {
+    return state.preview.map(function (item) { return item.raw; });
+  }
+
+  function renderPreview() {
+    var preview = state.preview;
+    if (!preview.length) {
+      els.previewBody.innerHTML = '<tr class="empty"><td colspan="5">未识别到任何 ID。请上传文件或在表格粘贴框中输入内容。</td></tr>';
+      els.previewSummary.textContent = '0 条';
+      return;
+    }
+
+    var html = preview.map(function (item) {
+      var tag = '';
+      var status = '';
+      if (item.ok && !item.duplicate) {
+        tag = item.type === 'link'
+          ? '<span class="link-tag">链接 → ' + esc(item.sku) + '</span>'
+          : '<span class="sku-tag">SKU ' + esc(item.sku) + '</span>';
+        status = '<span class="ok">✓ 已识别</span>';
+      } else if (item.duplicate) {
+        tag = '<span class="warn-tag">' + esc(item.reason || '重复') + '</span>';
+        status = '<span class="bad">重复</span>';
+      } else {
+        tag = '<span class="warn-tag">' + esc(item.reason || '未识别') + '</span>';
+        status = '<span class="bad">跳过</span>';
+      }
+
+      var checked = item.selected ? 'checked' : '';
+      var disabled = (item.ok && !item.duplicate) ? '' : 'disabled';
+
+      return '<tr data-index="' + (item.index - 1) + '">' +
+        '<td class="col-check"><input type="checkbox" class="row-check" ' + checked + ' ' + disabled + ' /></td>' +
+        '<td>' + item.index + '</td>' +
+        '<td class="raw" title="' + esc(item.raw) + '">' + esc(item.raw) + '</td>' +
+        '<td>' + tag + '</td>' +
+        '<td>' + status + '</td>' +
+        '</tr>';
+    }).join('');
+
+    els.previewBody.innerHTML = html;
+    var selectedCount = preview.filter(function (p) { return p.selected; }).length;
+    els.previewSummary.textContent = '共 ' + preview.length + ' 行，已选 ' + selectedCount + ' 条有效 ID';
+  }
+
+  function selectedIds() {
+    return state.preview
+      .filter(function (p) { return p.selected && p.ok && !p.duplicate; })
+      .map(function (p) { return p.sku; });
+  }
+
+  function parseIds() {
+    if (currentTabName() === 'table' && state.fileLoaded) {
+      return selectedIds();
+    }
+    var preview = buildPreview(parseTableText(currentInput()));
+    state.preview = preview;
+    renderPreview();
+    return preview.filter(function (p) { return p.ok && !p.duplicate; }).map(function (p) { return p.sku; });
+  }
+
+  /* ----------- SheetJS 按需加载 ----------- */
+  function ensureSheetJs() {
+    if (typeof window.XLSX !== 'undefined') return Promise.resolve(window.XLSX);
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = SHEETJS_CDN;
+      script.async = true;
+      script.onload = function () { resolve(window.XLSX); };
+      script.onerror = function () { reject(new Error('无法加载 SheetJS（请检查网络）')); };
+      document.head.appendChild(script);
+    });
+  }
+
+  /* ----------- 文件读取 ----------- */
+  async function handleFile(file) {
+    if (!file) return;
+    setStatus('', '正在解析文件 ' + file.name + ' ...');
+    var name = (file.name || '').toLowerCase();
+    try {
+      var items = [];
+      if (name.endsWith('.csv') || name.endsWith('.txt')) {
+        var text = await readFileAsText(file);
+        items = parseDelimitedRows(text);
+      } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        var XLSX = await ensureSheetJs();
+        var buffer = await readFileAsArrayBuffer(file);
+        var workbook = XLSX.read(buffer, { type: 'array' });
+        workbook.SheetNames.forEach(function (sheetName) {
+          var sheet = workbook.Sheets[sheetName];
+          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' });
+          items = items.concat(parseFileRows(rows));
+        });
+      } else {
+        throw new Error('暂不支持的文件类型：' + file.name);
+      }
+
+      if (!items.length) {
+        state.preview = [];
+        renderPreview();
+        setStatus('error', '文件为空或没有识别到内容');
+        return;
+      }
+
+      state.fileLoaded = true;
+      state.preview = buildPreview(items);
+      renderPreview();
+      setStatus('success', '已解析 ' + items.length + ' 行（文件：' + file.name + '）');
+    } catch (error) {
+      setStatus('error', '文件解析失败：' + error.message);
+    }
+  }
+
+  function readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || '')); };
+      reader.onerror = function () { reject(reader.error || new Error('读取失败')); };
+      reader.readAsText(file, 'utf-8');
+    });
+  }
+
+  function readFileAsArrayBuffer(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(reader.error || new Error('读取失败')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /* ----------- 调用桥接 ----------- */
   function friendlyError(data, status) {
     var code = data && (data.code || data.errorCode);
     var raw = data && ((data.error && (data.error.message || data.error.detail || data.error)) || data.message);
-
     if (code === 'seller_not_authenticated' || status === 401) {
       return 'Ozon Seller 登录已失效，请在专用 Chrome 中重新登录';
     }
@@ -93,10 +294,7 @@
     try {
       response = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ ids: ids }),
         signal: signal
       });
@@ -115,6 +313,7 @@
     return data;
   }
 
+  /* ----------- 渲染辅助 ----------- */
   function fmtMoney(value) {
     var number = Number(value || 0);
     if (!isFinite(number)) number = 0;
@@ -131,14 +330,6 @@
     var number = Number(value || 0);
     if (!isFinite(number)) number = 0;
     return number.toFixed(2) + '%';
-  }
-
-  function fmtStock(item) {
-    var stock = Number(item.stock || 0);
-    var fbo = Number(item.fboStock || 0);
-    var fbs = Number(item.fbsStock || 0);
-    if (stock) return fmtNumber(stock);
-    return fmtNumber(fbo + fbs);
   }
 
   function fmtDate(value) {
@@ -186,7 +377,7 @@
   }
 
   function esc(value) {
-    return String(value || '').replace(/[&<>"']/g, function (character) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (character) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
     });
   }
@@ -368,23 +559,81 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 500);
   }
 
+  /* ----------- 事件绑定 ----------- */
   els.run.addEventListener('click', run);
+
   els.stop.addEventListener('click', function () {
     state.aborted = true;
     if (state.controller) state.controller.abort();
     setStatus('error', '正在停止...');
   });
+
   els.clear.addEventListener('click', function () {
     if (state.running) return;
     Object.keys(els.inputs).forEach(function (key) { els.inputs[key].value = ''; });
     state.rows = [];
+    state.fileLoaded = false;
+    state.preview = [];
     render();
+    renderPreview();
     setStatus('', '等待输入...');
     setProgress(0, 0);
   });
+
   els.exportCsv.addEventListener('click', exportCsv);
   els.exportJson.addEventListener('click', exportJson);
   els.filter.addEventListener('input', render);
   els.sortKey.addEventListener('change', render);
+
+  els.fileInput.addEventListener('change', function () {
+    var file = els.fileInput.files && els.fileInput.files[0];
+    if (file) handleFile(file);
+  });
+
+  els.fileSample.addEventListener('click', function () {
+    els.inputs.table.value = [
+      'sku\tname',
+      '140030730\tКалинов Родник 6L',
+      'https://www.ozon.ru/product/149710140',
+      '150001234',
+      '150001235  (重复测试)',
+      '140030730',
+      '订单号: 158970015',
+      '不是ID的商品名称'
+    ].join('\n');
+    state.fileLoaded = false;
+    refreshPreview();
+    setStatus('', '已载入示例，请点击「开始查询」');
+  });
+
+  els.inputs.table.addEventListener('input', function () {
+    state.fileLoaded = false;
+    refreshPreview();
+  });
+
+  els.previewSelectAll.addEventListener('change', function () {
+    var checked = els.previewSelectAll.checked;
+    state.preview.forEach(function (item) {
+      if (item.ok && !item.duplicate) item.selected = checked;
+    });
+    renderPreview();
+  });
+
+  els.previewBody.addEventListener('change', function (event) {
+    var target = event.target;
+    if (!(target && target.classList && target.classList.contains('row-check'))) return;
+    var row = target.closest('tr');
+    if (!row) return;
+    var index = parseInt(row.getAttribute('data-index'), 10);
+    if (isNaN(index)) return;
+    var item = state.preview[index];
+    if (!item) return;
+    item.selected = target.checked;
+    var total = state.preview.length;
+    var selected = state.preview.filter(function (p) { return p.selected; }).length;
+    els.previewSummary.textContent = '共 ' + total + ' 行，已选 ' + selected + ' 条有效 ID';
+  });
+
   render();
+  renderPreview();
 })();
