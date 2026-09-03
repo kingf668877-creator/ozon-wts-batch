@@ -20,6 +20,7 @@
     stop: $('#stop-btn'),
     exportCsv: $('#export-csv'),
     exportJson: $('#export-json'),
+    exportFailed: $('#export-failed'),
     clear: $('#clear-btn'),
     status: $('#status'),
     statusText: $('#status-text'),
@@ -55,7 +56,8 @@
     fileLoaded: false,
     page: 1,
     pageSize: 25,
-    sortedRows: []
+    sortedRows: [],
+    failed: []
   };
 
   /* ----------- Tab 切换 ----------- */
@@ -496,6 +498,7 @@
     els.body.appendChild(fragment);
     els.exportCsv.disabled = state.rows.length === 0;
     els.exportJson.disabled = state.rows.length === 0;
+    els.exportFailed.disabled = state.failed.length === 0;
     renderPager();
   }
 
@@ -529,6 +532,7 @@
     }
 
     state.rows = [];
+    state.failed = [];
     state.aborted = false;
     state.seenSku = new Set();
     state.running = true;
@@ -541,7 +545,7 @@
     var interval = clamp(parseInt(els.interval.value, 10) || 0, 0, 5000);
     var total = ids.length;
     var done = 0;
-    var failed = [];
+    var failed = state.failed;
     var controller = new AbortController();
     state.controller = controller;
     setProgress(0, total);
@@ -564,6 +568,7 @@
           var result = bySku[requestedSku] || results[batchIndex];
           var items = result && Array.isArray(result.items) ? result.items : [];
           var matchedItem = items.find(function (item) { return String(item.sku || '') === requestedSku; });
+          var reason = '';
 
           if (result && result.ok && result.matched && matchedItem) {
             var row = fmtRow(matchedItem);
@@ -571,8 +576,18 @@
               state.seenSku.add(row.sku);
               state.rows.push(row);
             }
+          } else if (!result) {
+            reason = 'no-response';
+            failed.push({ sku: requestedSku, reason: reason });
+          } else if (!result.ok) {
+            reason = (result.error && result.error.message) || 'query-failed';
+            failed.push({ sku: requestedSku, reason: reason });
+          } else if (!items.length) {
+            reason = 'not-in-wts';
+            failed.push({ sku: requestedSku, reason: reason });
           } else {
-            failed.push(requestedSku);
+            reason = 'sku-mismatch';
+            failed.push({ sku: requestedSku, reason: reason });
           }
         });
 
@@ -585,7 +600,18 @@
       if (state.aborted) {
         setStatus('error', '已停止，已完成 ' + done + ' / ' + total + '，获得 ' + state.rows.length + ' 条结果');
       } else if (failed.length) {
-        setStatus('error', '查询完成：成功 ' + state.rows.length + ' 条，未匹配 ' + failed.length + ' 个（' + failed.join('、') + '）');
+        var reasons = {};
+        failed.forEach(function (item) {
+          reasons[item.reason] = (reasons[item.reason] || 0) + 1;
+        });
+        var notInWts = reasons['not-in-wts'] || 0;
+        var queryFailed = (reasons['query-failed'] || 0) + (reasons['no-response'] || 0);
+        var mismatch = reasons['sku-mismatch'] || 0;
+        var hint = [];
+        if (notInWts) hint.push(notInWts + ' 个不在 Ozon Seller What-to-Sell 数据库');
+        if (mismatch) hint.push(mismatch + ' 个返回数据 SKU 不匹配');
+        if (queryFailed) hint.push(queryFailed + ' 个查询失败');
+        setStatus('error', '查询完成：成功 ' + state.rows.length + ' 条，未匹配 ' + failed.length + ' 个（' + hint.join('；') + '）。点击「下载未匹配」可导出明细。');
       } else {
         setStatus('success', '查询完成，共 ' + state.rows.length + ' 条');
       }
@@ -620,6 +646,27 @@
     download(JSON.stringify(state.rows, null, 2), 'ozon-wts-result.json', 'application/json');
   }
 
+  function exportFailed() {
+    if (!state.failed.length) return;
+    var rows = [['sku', 'reason', 'reason_zh']];
+    var labels = {
+      'not-in-wts': '不在 Ozon Seller What-to-Sell 数据库',
+      'sku-mismatch': '返回数据 SKU 不匹配',
+      'query-failed': '查询失败',
+      'no-response': '无响应'
+    };
+    state.failed.forEach(function (item) {
+      rows.push([item.sku, item.reason, labels[item.reason] || item.reason]);
+    });
+    var lines = rows.map(function (cells) {
+      return cells.map(function (cell) {
+        var text = String(cell == null ? '' : cell);
+        return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+      }).join(',');
+    });
+    download('\ufeff' + lines.join('\n'), 'ozon-wts-unmatched.csv', 'text/csv;charset=utf-8');
+  }
+
   function download(text, name, mime) {
     var blob = new Blob([text], { type: mime });
     var url = URL.createObjectURL(blob);
@@ -645,6 +692,7 @@
     if (state.running) return;
     Object.keys(els.inputs).forEach(function (key) { els.inputs[key].value = ''; });
     state.rows = [];
+    state.failed = [];
     state.fileLoaded = false;
     state.preview = [];
     state.page = 1;
@@ -656,6 +704,7 @@
 
   els.exportCsv.addEventListener('click', exportCsv);
   els.exportJson.addEventListener('click', exportJson);
+  els.exportFailed.addEventListener('click', exportFailed);
   els.filter.addEventListener('input', function () { state.page = 1; render(); });
   els.sortKey.addEventListener('change', function () { state.page = 1; render(); });
 
