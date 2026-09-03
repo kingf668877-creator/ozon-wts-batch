@@ -83,3 +83,25 @@ tbody tr.empty td{text-align:center;color:var(--muted);padding:24px 12px;}
 .foot .container{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
 .actions a{color:#93c5fd;text-decoration:none;}
 .actions a:hover{text-decoration:underline;}
+
+/* 上传 + 预览 */
+.upload-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.upload-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(59,130,246,.18);border:1px dashed rgba(59,130,246,.45);border-radius:8px;color:#cbd5e1;font-size:12px;cursor:pointer;}
+.upload-btn:hover{background:rgba(59,130,246,.28);}
+button.small{padding:6px 10px;font-size:12px;}
+.preview-head{display:flex;align-items:center;gap:10px;margin:14px 0 6px;font-size:12px;color:var(--muted);}
+.preview-head .spacer{flex:1;}
+.preview-head .checkbox{display:inline-flex;align-items:center;gap:4px;color:var(--muted);}
+.preview-wrap{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:rgba(15,23,42,.4);}
+.preview-table{width:100%;border-collapse:collapse;font-size:12px;min-width:auto;}
+.preview-table th,.preview-table td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left;}
+.preview-table th.col-check,.preview-table td.col-check{width:36px;text-align:center;}
+.preview-table .empty td{text-align:center;color:var(--muted);padding:18px 8px;}
+.preview-table .raw{max-width:280px;overflow:hidden;text-overflow:ellipsis;}
+.preview-table .ok{color:var(--good);}
+.preview-table .bad{color:var(--bad);}
+.preview-table .sku-tag{display:inline-block;padding:1px 6px;border-radius:6px;background:rgba(34,197,94,.18);color:#86efac;font-size:11px;}
+.preview-table .link-tag{display:inline-block;padding:1px 6px;border-radius:6px;background:rgba(59,130,246,.18);color:#93c5fd;font-size:11px;}
+.preview-table .warn-tag{display:inline-block;padding:1px 6px;border-radius:6px;background:rgba(245,158,11,.18);color:#fbbf24;font-size:11px;}
+.preview-table input[type=checkbox]{cursor:pointer;}
+.muted{color:var(--muted);}
