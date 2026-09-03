@@ -1,42 +1,345 @@
 /* OZON 畅销商品批量查询 · 前端逻辑 */
-(function(){
+(function () {
   'use strict';
-  const API_URL='https://api.seller.ozon.ru/api/site/seller-analytics/what_to_sell/data/v3';
-  const $=function(s){return document.querySelector(s);};
-  const els={
-    tabs:document.querySelectorAll('.tab'),
-    panels:document.querySelectorAll('.tab-panel'),
-    inputs:{ids:$('#input-ids'),links:$('#input-links'),table:$('#input-table')},
-    batch:$('#batch-size'),concurrency:$('#concurrency'),interval:$('#interval'),
-    run:$('#run-btn'),stop:$('#stop-btn'),exportCsv:$('#export-csv'),exportJson:$('#export-json'),clear:$('#clear-btn'),
-    status:$('#status'),statusText:$('#status-text'),progressBar:$('#progress-bar'),progressText:$('#progress-text'),
-    table:$('#result-table'),body:$('#result-body'),count:$('#result-count'),
-    filter:$('#filter-input'),sortKey:$('#sort-key'),
+
+  const API_URL = 'https://yidong.dianleida.net:21999/api/wts/query';
+  const $ = function (selector) { return document.querySelector(selector); };
+  const els = {
+    tabs: document.querySelectorAll('.tab'),
+    panels: document.querySelectorAll('.tab-panel'),
+    inputs: {
+      ids: $('#input-ids'),
+      links: $('#input-links'),
+      table: $('#input-table')
+    },
+    batch: $('#batch-size'),
+    interval: $('#interval'),
+    run: $('#run-btn'),
+    stop: $('#stop-btn'),
+    exportCsv: $('#export-csv'),
+    exportJson: $('#export-json'),
+    clear: $('#clear-btn'),
+    status: $('#status'),
+    statusText: $('#status-text'),
+    progressBar: $('#progress-bar'),
+    progressText: $('#progress-text'),
+    body: $('#result-body'),
+    count: $('#result-count'),
+    filter: $('#filter-input'),
+    sortKey: $('#sort-key')
   };
-  const state={rows:[],aborted:false,running:false,seenSku:new Set()};
-  els.tabs.forEach(function(t){t.addEventListener('click',function(){els.tabs.forEach(function(x){x.classList.toggle('active',x===t);});els.panels.forEach(function(p){p.classList.toggle('active',p.dataset.tab===t.dataset.tab);});});});
-  function currentInput(){var active=document.querySelector('.tab-panel.active'); if(!active)return ''; return els.inputs[active.dataset.tab].value||'';}
-  function parseIds(){var raw=currentInput(); var items=raw.split(/[\s,;\t\n]+/).map(function(s){return s.replace(/^["\'\`]+|["\'\`]+$/g,'').trim();}).filter(Boolean); var seen={}; var out=[]; for(var i=0;i<items.length;i++){var n=extractSku(items[i]); if(n && !seen[n]){seen[n]=1; out.push(n);}} return out;}
-  function extractSku(t){if(!t)return ''; var m=t.match(/ozon\.ru\/product\/(\d{5,12})/i); if(m)return m[1]; var m2=t.match(/(?:^|\b)(?:sku|id|product)[ _:=-]+(\d{5,12})\b/i); if(m2)return m2[1]; var m3=t.match(/\b(\d{5,12})\b/); return m3?m3[1]:'';}
-  async function callOne(sku,signal){var body={limit:'50',offset:'0',filter:{stock:'any_stock',period:'weekly',categories:[],sku:sku},sort:{key:'sum_missed_gmv',order:'desc'}}; var r=await fetch(API_URL,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json',Accept:'application/json, text/plain, */*','x-o3-app-name':'seller-ui','x-o3-language':'zh-Hans','x-o3-page-type':'analytics_platform'},body:JSON.stringify(body),signal:signal}); if(!r.ok){throw new Error('HTTP '+r.status);} var j=await r.json(); return Array.isArray(j.items)?j.items:[];}
-  async function runOne(sku,signal){for(var i=0;i<3;i++){if(state.aborted)throw new Error('aborted'); try{return await callOne(sku,signal);}catch(e){await new Promise(function(r){setTimeout(r,600*(i+1));});} } throw new Error('sku failed');}
-  async function pool(items,limit,fn){var q=items.slice(); var w=new Array(Math.min(limit,q.length)).fill(0).map(async function(){while(q.length && !state.aborted){var it=q.shift(); try{await fn(it);}catch(e){console.warn(e);}}}); await Promise.all(w);}
-  function fmtRow(it){return{sku:it.sku||'',name:it.name||'',brand:it.brand||'',category1:it.category1||'',category2:it.category2||'',category3:it.category3||'',link:it.link||'',photo:it.photo||'',gmvSum:Number(it.gmvSum||0),soldCount:Number(it.soldCount||0),minSellerPrice:Number(it.minSellerPrice||0),avgGmv:Number(it.avgGmv||0),sumMissedGmv:Number(it.sumMissedGmv||0),salesDynamics:Number(it.nullableSalesDynamics??it.salesDynamics??0),avgGmvOnAccDays:Number(it.avgGmvOnAccDays||0),avgOrdersOnAccDays:Number(it.avgOrdersOnAccDays||0),sessionCountSearch:Number(it.sessionCountSearch||0),sessionCount:Number(it.sessionCount||0),convToCartSearch:Number(it.convToCartSearch||0),pdpToCartConversion:Number(it.pdpToCartConversion||0),advCostShare:Number(it.advCostShare||0),nullableBuyoutShare:Number(it.nullableBuyoutRate??it.nullableBuyoutShare??0),nullableCreateDate:it.nullableCreateDate||'',fboCommission:Number(it.fboCommission||0),fbsCommission:Number(it.fbsCommission||0),salesSchema:it.salesSchema||'',volume:Number(it.volume||0)};}
-  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&','<':'<','>':'>','"':'"','\'':'''}[c];});}
-  function render(){var f=(els.filter.value||'').toLowerCase(); var sk=els.sortKey.value; var rows=state.rows.slice(); if(f){rows=rows.filter(function(r){return [r.sku,r.name,r.brand,r.category3,r.category1].some(function(x){return String(x||'').toLowerCase().indexOf(f)>=0;});});} rows.sort(function(a,b){return (b[sk]||0)-(a[sk]||0);}); els.count.textContent=rows.length; els.body.innerHTML=rows.length?'':'<tr class="empty"><td colspan="12">'+(state.rows.length?'过滤无结果':'暂无数据')+'</td></tr>'; var f2=document.createDocumentFragment(); rows.forEach(function(r,i){var tr=document.createElement('tr'); tr.innerHTML='<td>'+(i+1)+'</td><td class="sku"><a href="'+r.link+'" target="_blank">'+r.sku+'</a></td><td><div class="product-cell">'+(r.photo?'<img src="'+r.photo+'" loading="lazy" />':'')+'<span>'+esc(r.name)+'</span></div></td><td>'+(esc(r.brand)||'-')+'</td><td>'+(esc(r.category3)||esc(r.category1)||'-')+'</td><td>'+(r.gmvSum||0).toLocaleString()+'</td><td>'+(r.soldCount||0).toLocaleString()+'</td><td>'+(r.avgGmv||0).toLocaleString()+'</td><td>'+(r.sumMissedGmv||0).toLocaleString()+'</td><td>'+r.salesDynamics+'%</td><td>'+(r.pdpToCartConversion||0).toFixed(2)+'%</td><td><a href="'+r.link+'" target="_blank">查看</a></td>'; f2.appendChild(tr);}); els.body.appendChild(f2); els.exportCsv.disabled=state.rows.length===0; els.exportJson.disabled=state.rows.length===0;}
-  function setStatus(cls,text){els.status.classList.remove('running','success','error'); if(cls)els.status.classList.add(cls); els.statusText.textContent=text;}
-  function setProgress(d,t){var pct=t?Math.min(100,Math.round(d/t*100)):0; els.progressBar.style.setProperty('--p',pct+'%'); els.progressText.textContent=d+' / '+t;}
-  function clamp(n,mn,mx){n=Number(n); if(isNaN(n))return mn; return Math.max(mn,Math.min(mx,n));}
-  async function run(){if(state.running)return; var ids=parseIds(); if(!ids.length){setStatus('error','没有解析到 ID'); return;} state.rows=[]; state.aborted=false; state.seenSku=new Set(); state.running=true; els.run.disabled=true; els.stop.disabled=false; setStatus('running','开始查询 '+ids.length+' 个 ID ...'); var bs=clamp(parseInt(els.batch.value)||30,1,100); var iv=clamp(parseInt(els.interval.value)||200,0,5000); var cc=clamp(parseInt(els.concurrency.value)||3,1,8); var done=0; var total=ids.length; var ac=new AbortController(); state._ac=ac; try{setProgress(0,total); for(var i=0;i<ids.length;i+=bs){if(state.aborted)break; var batch=ids.slice(i,i+bs); await pool(batch,cc,async function(sku){if(state.aborted)return; try{var items=await runOne(sku,ac.signal); for(var j=0;j<items.length;j++){var r=fmtRow(items[j]); if(!state.seenSku.has(r.sku)){state.seenSku.add(r.sku); state.rows.push(r);}}}catch(e){console.warn(sku,e);} done++; setProgress(done,total); render(); if(iv>0)await new Promise(function(res){setTimeout(res,iv);});});} setStatus(state.aborted?'error':'success',(state.aborted?'已停止 ·共 ':'完成 ·共 ')+state.rows.length+' 条');}catch(e){setStatus('error','失败: '+e.message);} finally{state.running=false; els.run.disabled=false; els.stop.disabled=true;}}
-  function exportCsv(){var headers=['sku','name','brand','category1','category2','category3','link','photo','gmvSum','soldCount','minSellerPrice','avgGmv','sumMissedGmv','salesDynamics','avgGmvOnAccDays','avgOrdersOnAccDays','sessionCountSearch','sessionCount','convToCartSearch','pdpToCartConversion','advCostShare','nullableBuyoutShare','nullableCreateDate','fboCommission','fbsCommission','salesSchema','volume']; var e=function(v){var s=String(v==null?'':v); return /[",\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s;}; var out=[headers.join(',')]; for(var i=0;i<state.rows.length;i++){out.push(headers.map(function(k){return e(state.rows[i][k]);}).join(','));} download('\ufeff'+out.join('\n'),'ozon-wts-result.csv','text/csv;charset=utf-8');}
-  function exportJson(){download(JSON.stringify(state.rows,null,2),'ozon-wts-result.json','application/json');}
-  function download(text,name,mime){var blob=new Blob([text],{type:mime}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function(){URL.revokeObjectURL(url);},500);}
-  els.run.addEventListener('click',run);
-  els.stop.addEventListener('click',function(){state.aborted=true; if(state._ac)state._ac.abort(); setStatus('error','正在停止...');});
-  els.clear.addEventListener('click',function(){if(state.running)return; for(var k in els.inputs)els.inputs[k].value=''; state.rows=[]; render(); setStatus('error','等待输入...'); setProgress(0,0);});
-  els.exportCsv.addEventListener('click',exportCsv);
-  els.exportJson.addEventListener('click',exportJson);
-  els.filter.addEventListener('input',render);
-  els.sortKey.addEventListener('change',render);
+  const state = { rows: [], aborted: false, running: false, seenSku: new Set(), controller: null };
+
+  els.tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      els.tabs.forEach(function (item) { item.classList.toggle('active', item === tab); });
+      els.panels.forEach(function (panel) { panel.classList.toggle('active', panel.dataset.tab === tab.dataset.tab); });
+    });
+  });
+
+  function currentInput() {
+    var active = document.querySelector('.tab-panel.active');
+    return active ? (els.inputs[active.dataset.tab].value || '') : '';
+  }
+
+  function parseIds() {
+    var items = currentInput().split(/[\s,;\t\n]+/).map(function (value) {
+      return value.replace(/^["'`]+|["'`]+$/g, '').trim();
+    }).filter(Boolean);
+    var seen = {};
+    var output = [];
+
+    items.forEach(function (item) {
+      var sku = extractSku(item);
+      if (sku && !seen[sku]) {
+        seen[sku] = true;
+        output.push(sku);
+      }
+    });
+    return output;
+  }
+
+  function extractSku(text) {
+    if (!text) return '';
+    var fromLink = text.match(/ozon\.ru\/product\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
+    if (fromLink) return fromLink[1];
+    var labelled = text.match(/(?:^|\b)(?:sku|id|product)[ _:=-]+(\d{5,12})\b/i);
+    if (labelled) return labelled[1];
+    var plain = text.match(/\b(\d{5,12})\b/);
+    return plain ? plain[1] : '';
+  }
+
+  function friendlyError(data, status) {
+    var code = data && (data.code || data.errorCode);
+    var raw = data && ((data.error && (data.error.message || data.error.detail || data.error)) || data.message);
+
+    if (code === 'seller_not_authenticated' || status === 401) {
+      return 'Ozon Seller 登录已失效，请在专用 Chrome 中重新登录';
+    }
+    if (code === 'seller_tab_not_found') {
+      return '未找到 Seller 页面，请先运行桌面“一键启动图搜”';
+    }
+    if (status === 429) {
+      return '查询过于频繁，请稍后重试';
+    }
+    if (status >= 500) {
+      return '本地查询服务暂时不可用，请确认“一键启动图搜”正在运行';
+    }
+    return typeof raw === 'string' ? raw : '查询失败（HTTP ' + status + '）';
+  }
+
+  async function callBatch(ids, signal) {
+    var response;
+    try {
+      response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ ids: ids }),
+        signal: signal
+      });
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw error;
+      throw new Error('无法连接查询服务，请确认桌面“一键启动图搜”和公网映射均已运行');
+    }
+
+    var data;
+    try {
+      data = await response.json();
+    } catch (error) {
+      throw new Error('服务返回了无法解析的数据（HTTP ' + response.status + '）');
+    }
+    if (!response.ok) throw new Error(friendlyError(data, response.status));
+    return data;
+  }
+
+  function fmtRow(item) {
+    return {
+      sku: item.sku || '',
+      name: item.name || '',
+      brand: item.brand || '',
+      category1: item.category1 || '',
+      category2: item.category2 || '',
+      category3: item.category3 || '',
+      link: item.link || '',
+      photo: item.photo || '',
+      gmvSum: Number(item.gmvSum || 0),
+      soldCount: Number(item.soldCount || 0),
+      minSellerPrice: Number(item.minSellerPrice || 0),
+      avgGmv: Number(item.avgGmv || 0),
+      sumMissedGmv: Number(item.sumMissedGmv || 0),
+      salesDynamics: Number(item.nullableSalesDynamics ?? item.salesDynamics ?? 0),
+      avgGmvOnAccDays: Number(item.avgGmvOnAccDays || 0),
+      avgOrdersOnAccDays: Number(item.avgOrdersOnAccDays || 0),
+      sessionCountSearch: Number(item.sessionCountSearch || 0),
+      sessionCount: Number(item.sessionCount || 0),
+      convToCartSearch: Number(item.convToCartSearch || 0),
+      pdpToCartConversion: Number(item.pdpToCartConversion || 0),
+      advCostShare: Number(item.advCostShare || 0),
+      nullableBuyoutShare: Number(item.nullableBuyoutRate ?? item.nullableBuyoutShare ?? 0),
+      nullableCreateDate: item.nullableCreateDate || '',
+      fboCommission: Number(item.fboCommission || 0),
+      fbsCommission: Number(item.fbsCommission || 0),
+      salesSchema: item.salesSchema || '',
+      volume: Number(item.volume || 0)
+    };
+  }
+
+  function esc(value) {
+    return String(value || '').replace(/[&<>"']/g, function (character) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+    });
+  }
+
+  function render() {
+    var filter = (els.filter.value || '').toLowerCase();
+    var sortKey = els.sortKey.value;
+    var rows = state.rows.slice();
+
+    if (filter) {
+      rows = rows.filter(function (row) {
+        return [row.sku, row.name, row.brand, row.category3, row.category1].some(function (value) {
+          return String(value || '').toLowerCase().indexOf(filter) >= 0;
+        });
+      });
+    }
+    rows.sort(function (a, b) { return (b[sortKey] || 0) - (a[sortKey] || 0); });
+    els.count.textContent = rows.length;
+    els.body.innerHTML = rows.length ? '' : '<tr class="empty"><td colspan="12">' + (state.rows.length ? '过滤无结果' : '暂无数据') + '</td></tr>';
+
+    var fragment = document.createDocumentFragment();
+    rows.forEach(function (row, index) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (index + 1) + '</td>' +
+        '<td class="sku"><a href="' + esc(row.link) + '" target="_blank" rel="noopener">' + esc(row.sku) + '</a></td>' +
+        '<td><div class="product-cell">' + (row.photo ? '<img src="' + esc(row.photo) + '" loading="lazy" />' : '') + '<span>' + esc(row.name) + '</span></div></td>' +
+        '<td>' + (esc(row.brand) || '-') + '</td>' +
+        '<td>' + (esc(row.category3) || esc(row.category1) || '-') + '</td>' +
+        '<td>' + (row.gmvSum || 0).toLocaleString() + '</td>' +
+        '<td>' + (row.soldCount || 0).toLocaleString() + '</td>' +
+        '<td>' + (row.avgGmv || 0).toLocaleString() + '</td>' +
+        '<td>' + (row.sumMissedGmv || 0).toLocaleString() + '</td>' +
+        '<td>' + row.salesDynamics + '%</td>' +
+        '<td>' + (row.pdpToCartConversion || 0).toFixed(2) + '%</td>' +
+        '<td><a href="' + esc(row.link) + '" target="_blank" rel="noopener">查看</a></td>';
+      fragment.appendChild(tr);
+    });
+    els.body.appendChild(fragment);
+    els.exportCsv.disabled = state.rows.length === 0;
+    els.exportJson.disabled = state.rows.length === 0;
+  }
+
+  function setStatus(cssClass, text) {
+    els.status.classList.remove('running', 'success', 'error');
+    if (cssClass) els.status.classList.add(cssClass);
+    els.statusText.textContent = text;
+  }
+
+  function setProgress(done, total) {
+    var percentage = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+    els.progressBar.style.setProperty('--p', percentage + '%');
+    els.progressText.textContent = done + ' / ' + total;
+  }
+
+  function clamp(number, min, max) {
+    number = Number(number);
+    return isNaN(number) ? min : Math.max(min, Math.min(max, number));
+  }
+
+  function wait(milliseconds) {
+    return new Promise(function (resolve) { setTimeout(resolve, milliseconds); });
+  }
+
+  async function run() {
+    if (state.running) return;
+    var ids = parseIds();
+    if (!ids.length) {
+      setStatus('error', '没有解析到 ID');
+      return;
+    }
+
+    state.rows = [];
+    state.aborted = false;
+    state.seenSku = new Set();
+    state.running = true;
+    els.run.disabled = true;
+    els.stop.disabled = false;
+    render();
+
+    var batchSize = clamp(parseInt(els.batch.value, 10) || 12, 1, 12);
+    var interval = clamp(parseInt(els.interval.value, 10) || 0, 0, 5000);
+    var total = ids.length;
+    var done = 0;
+    var failed = [];
+    var controller = new AbortController();
+    state.controller = controller;
+    setProgress(0, total);
+
+    try {
+      for (var index = 0; index < ids.length; index += batchSize) {
+        if (state.aborted) break;
+        var batch = ids.slice(index, index + batchSize);
+        setStatus('running', '正在查询 ' + (done + 1) + ' - ' + Math.min(done + batch.length, total) + '，共 ' + total + ' 个 ID');
+        var data = await callBatch(batch, controller.signal);
+        var results = Array.isArray(data.results) ? data.results : [];
+        var bySku = {};
+
+        results.forEach(function (result) {
+          var requested = String(result.requestedSku || result.sku || '');
+          if (requested) bySku[requested] = result;
+        });
+
+        batch.forEach(function (requestedSku, batchIndex) {
+          var result = bySku[requestedSku] || results[batchIndex];
+          var items = result && Array.isArray(result.items) ? result.items : [];
+          var matchedItem = items.find(function (item) { return String(item.sku || '') === requestedSku; });
+
+          if (result && result.ok && result.matched && matchedItem) {
+            var row = fmtRow(matchedItem);
+            if (!state.seenSku.has(row.sku)) {
+              state.seenSku.add(row.sku);
+              state.rows.push(row);
+            }
+          } else {
+            failed.push(requestedSku);
+          }
+        });
+
+        done += batch.length;
+        setProgress(done, total);
+        render();
+        if (interval > 0 && done < total) await wait(interval);
+      }
+
+      if (state.aborted) {
+        setStatus('error', '已停止，已完成 ' + done + ' / ' + total + '，获得 ' + state.rows.length + ' 条结果');
+      } else if (failed.length) {
+        setStatus('error', '查询完成：成功 ' + state.rows.length + ' 条，未匹配 ' + failed.length + ' 个（' + failed.join('、') + '）');
+      } else {
+        setStatus('success', '查询完成，共 ' + state.rows.length + ' 条');
+      }
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        setStatus('error', '已停止，已完成 ' + done + ' / ' + total + '，获得 ' + state.rows.length + ' 条结果');
+      } else {
+        setStatus('error', '查询失败：' + (error.message || String(error)));
+      }
+    } finally {
+      state.running = false;
+      state.controller = null;
+      els.run.disabled = false;
+      els.stop.disabled = true;
+    }
+  }
+
+  function exportCsv() {
+    var headers = ['sku', 'name', 'brand', 'category1', 'category2', 'category3', 'link', 'photo', 'gmvSum', 'soldCount', 'minSellerPrice', 'avgGmv', 'sumMissedGmv', 'salesDynamics', 'avgGmvOnAccDays', 'avgOrdersOnAccDays', 'sessionCountSearch', 'sessionCount', 'convToCartSearch', 'pdpToCartConversion', 'advCostShare', 'nullableBuyoutShare', 'nullableCreateDate', 'fboCommission', 'fbsCommission', 'salesSchema', 'volume'];
+    var escapeCsv = function (value) {
+      var text = String(value == null ? '' : value);
+      return /[",\n]/.test(text) ? ('"' + text.replace(/"/g, '""') + '"') : text;
+    };
+    var output = [headers.join(',')];
+    state.rows.forEach(function (row) {
+      output.push(headers.map(function (key) { return escapeCsv(row[key]); }).join(','));
+    });
+    download('\ufeff' + output.join('\n'), 'ozon-wts-result.csv', 'text/csv;charset=utf-8');
+  }
+
+  function exportJson() {
+    download(JSON.stringify(state.rows, null, 2), 'ozon-wts-result.json', 'application/json');
+  }
+
+  function download(text, name, mime) {
+    var blob = new Blob([text], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+  }
+
+  els.run.addEventListener('click', run);
+  els.stop.addEventListener('click', function () {
+    state.aborted = true;
+    if (state.controller) state.controller.abort();
+    setStatus('error', '正在停止...');
+  });
+  els.clear.addEventListener('click', function () {
+    if (state.running) return;
+    Object.keys(els.inputs).forEach(function (key) { els.inputs[key].value = ''; });
+    state.rows = [];
+    render();
+    setStatus('', '等待输入...');
+    setProgress(0, 0);
+  });
+  els.exportCsv.addEventListener('click', exportCsv);
+  els.exportJson.addEventListener('click', exportJson);
+  els.filter.addEventListener('input', render);
+  els.sortKey.addEventListener('change', render);
   render();
 })();
