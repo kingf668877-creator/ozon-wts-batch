@@ -16,6 +16,7 @@
     },
     batch: $('#batch-size'),
     interval: $('#interval'),
+    periodToggle: $('#period-toggle'),
     run: $('#run-btn'),
     stop: $('#stop-btn'),
     exportCsv: $('#export-csv'),
@@ -57,7 +58,8 @@
     page: 1,
     pageSize: 25,
     sortedRows: [],
-    failed: []
+    failed: [],
+    period: 'monthly'  // 默认 28 天窗口（7 天窗口数据不全，易误判「不在库」）
   };
 
   /* ----------- Tab 切换 ----------- */
@@ -71,7 +73,7 @@
   /* ----------- 解析：把任意输入拆成 {raw, sku, type, ok, selected} 列表 ----------- */
   function extractSku(text) {
     if (!text) return '';
-    var fromLink = text.match(/ozon\.ru\/product\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
+    var fromLink = text.match(/ozon\.ru\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
     if (fromLink) return fromLink[1];
     var labelled = text.match(/(?:^|\b)(?:sku|id|product|article|货号)[ _:=-]+(\d{5,12})\b/i);
     if (labelled) return labelled[1];
@@ -309,7 +311,7 @@
       response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ ids: ids }),
+        body: JSON.stringify({ ids: ids, period: state.period }),
         signal: signal
       });
     } catch (error) {
@@ -680,6 +682,22 @@
   }
 
   /* ----------- 事件绑定 ----------- */
+  // 查询周期切换（7 天 / 28 天），默认 28 天
+  if (els.periodToggle) {
+    els.periodToggle.addEventListener('click', function (event) {
+      var btn = event.target.closest('.period-btn');
+      if (!btn || !els.periodToggle.contains(btn)) return;
+      var period = btn.getAttribute('data-period');
+      if (!period || period === state.period) return;
+      state.period = period;
+      els.periodToggle.querySelectorAll('.period-btn').forEach(function (b) {
+        var isActive = b === btn;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    });
+  }
+
   els.run.addEventListener('click', run);
 
   els.stop.addEventListener('click', function () {
