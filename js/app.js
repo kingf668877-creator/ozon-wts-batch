@@ -73,7 +73,7 @@
   /* ----------- 解析：把任意输入拆成 {raw, sku, type, ok, selected} 列表 ----------- */
   function extractSku(text) {
     if (!text) return '';
-    var fromLink = text.match(/ozon\.ru\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
+    var fromLink = text.match(/ozon\.ru\/product\/(?:[^/?#]*-)?(\d{5,12})(?:[/?#]|$)/i);
     if (fromLink) return fromLink[1];
     var labelled = text.match(/(?:^|\b)(?:sku|id|product|article|货号)[ _:=-]+(\d{5,12})\b/i);
     if (labelled) return labelled[1];
