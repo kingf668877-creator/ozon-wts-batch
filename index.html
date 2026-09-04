@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OZON 畅销商品批量查询 · What to Sell</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23005bff'/><text x='32' y='44' font-family='Segoe UI,Arial' font-size='34' font-weight='700' text-anchor='middle' fill='white'>O</text></svg>" />
-  <link rel="stylesheet" href="css/style.css?v=20260903-8" />
+  <link rel="stylesheet" href="css/style.css?v=20260904-1" />
 </head>
 <body>
   <header class="hero">
@@ -67,6 +67,13 @@
         </div>
       </div>
       <div class="row">
+        <div class="field">
+          <span>查询周期</span>
+          <div class="period-toggle" id="period-toggle" role="group" aria-label="查询周期">
+            <button type="button" class="period-btn" data-period="weekly" aria-pressed="false">7 天</button>
+            <button type="button" class="period-btn active" data-period="monthly" aria-pressed="true">28 天</button>
+          </div>
+        </div>
         <label class="field"><span>每批最多 ID</span><input id="batch-size" type="number" value="12" min="1" max="12" /></label>
         <label class="field"><span>批次间隔(ms)</span><input id="interval" type="number" value="300" min="0" max="5000" /></label>
       </div>
@@ -108,6 +115,6 @@
     </section>
   </main>
   <footer class="foot"><div class="container"><span>OZON 畅销商品批量查询</span><span><a href="https://github.com/kingf668877-creator/ozon-wts-batch">GitHub</a></span></div></footer>
-  <script src="js/app.js?v=20260903-8"></script>
+  <script src="js/app.js?v=20260904-1"></script>
 </body>
 </html>
